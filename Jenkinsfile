@@ -1,11 +1,9 @@
 pipeline {
      environment {
-       ID_DOCKER = "${ID_DOCKER_PARAMS}"
        IMAGE_NAME = "alpinehelloworld"
-       	IMAGE_TAG = "latest"
-	PORT_EXPOSED = "80" à paraméter dans le job
-       STAGING = "${ID_DOCKER}-staging"
-       PRODUCTION = "${ID_DOCKER}-production"
+       IMAGE_TAG = "latest"
+       STAGING = "mndlr-staging"
+       PRODUCTION = "mndlr-production"
      }
      agent none
      stages {
@@ -13,7 +11,7 @@ pipeline {
              agent any
              steps {
                 script {
-                  sh 'docker build -t ${ID_DOCKER}/$IMAGE_NAME:$IMAGE_TAG .'
+                  sh 'docker build -t mndlr/$IMAGE_NAME:$IMAGE_TAG .'
                 }
              }
         }
@@ -22,9 +20,7 @@ pipeline {
             steps {
                script {
                  sh '''
-                    echo "Clean Environment"
-                    docker rm -f $IMAGE_NAME || echo "container does not exist"
-                    docker run --name $IMAGE_NAME -d -p ${PORT_EXPOSED}:5000 -e PORT=5000 ${ID_DOCKER}/$IMAGE_NAME:$IMAGE_TAG
+                    docker run --name $IMAGE_NAME -d -p 80:5000 -e PORT=5000 mndlr/$IMAGE_NAME:$IMAGE_TAG
                     sleep 5
                  '''
                }
@@ -35,7 +31,7 @@ pipeline {
            steps {
               script {
                 sh '''
-                    curl http://172.17.0.1:${PORT_EXPOSED} | grep -q "Hello world!"
+                    curl http://172.17.0.1 | grep -q "Hello world!"
                 '''
               }
            }
@@ -51,7 +47,6 @@ pipeline {
              }
           }
      }
-     
      stage('Push image in staging and deploy it') {
        when {
               expression { GIT_BRANCH == 'origin/master' }
@@ -63,7 +58,6 @@ pipeline {
       steps {
           script {
             sh '''
-              npm i -g heroku@7.68.0
               heroku container:login
               heroku create $STAGING || echo "project already exist"
               heroku container:push -a $STAGING web
@@ -72,10 +66,9 @@ pipeline {
           }
         }
      }
-	 
      stage('Push image in production and deploy it') {
        when {
-              expression { GIT_BRANCH == 'origin/production' }
+              expression { GIT_BRANCH == 'origin/master' }
             }
       agent any
       environment {
@@ -84,7 +77,6 @@ pipeline {
       steps {
           script {
             sh '''
-              npm i -g heroku@7.68.0
               heroku container:login
               heroku create $PRODUCTION || echo "project already exist"
               heroku container:push -a $PRODUCTION web
